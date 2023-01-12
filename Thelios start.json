@@ -1,0 +1,11 @@
+{
+    "brands": [
+        {
+            "brand": "Celine",
+            "glasses_type": {
+                "sunglasses": true,
+                "eyeglasses": true
+            }
+        }
+    ]
+}
