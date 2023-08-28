@@ -134,3 +134,4 @@ requirements/*.json
 *.ico
 *.bat
 *.xlsx
+Logs/*
