@@ -80,7 +80,6 @@ class Thelios_Scraper:
             self.wait_until_browsing()
 
             if self.login(store.username, store.password):
-
                 if self.wait_until_element_found(20, 'css_selector', 'div[data-label="Sun"] > a'):
                     print('Scraping products for')
                     for brand_with_type in brands_with_types:
@@ -88,11 +87,11 @@ class Thelios_Scraper:
 
                         for glasses_type in brand_with_type['glasses_type']:
                             
-                            print(f'Brand: {brand} | Type: {glasses_type}')
+                            print(f'Brand: {brand} | Type: {str(glasses_type).strip().title()}')
                             scraped_products = 0
                             brand_url = ''
                             
-                            if glasses_type == 'Sunglasses':
+                            if str(glasses_type).strip().lower() == 'sunglasses':
                                 if str('Celine').strip().lower() == str(brand).strip().lower():
                                     brand_url = 'https://my.thelios.com/it/it/Maison/c/00?q=%3Arelevance%3Atype%3ASole%3AfittingDescription%3AUniversal%3AfittingDescription%3AInternational%3Apurchasable%3Apurchasable%3AimShip%3Afalse%3AnewArrivals%3Afalse%3AallCategoriesForName%3ACeline&text=&newArrivals=false#'
                                 elif str('Dior').strip().lower() == str(brand).strip().lower():
@@ -103,7 +102,7 @@ class Thelios_Scraper:
                                     brand_url = 'https://my.thelios.com/it/it/Maison/c/00?q=%3Arelevance%3Atype%3ASole%3AfittingDescription%3AUniversal%3AfittingDescription%3AInternational%3Apurchasable%3Apurchasable%3AimShip%3Afalse%3AnewArrivals%3Afalse%3AallCategoriesForName%3AGivenchy&text=&newArrivals=false#'
                                 elif str('Stella McCartney').strip().lower() == str(brand).strip().lower():
                                     brand_url = 'https://my.thelios.com/it/it/Maison/c/00?q=%3Arelevance%3Atype%3ASole%3AfittingDescription%3AUniversal%3AfittingDescription%3AInternational%3Apurchasable%3Apurchasable%3AimShip%3Afalse%3AnewArrivals%3Afalse%3AallCategoriesForName%3AStella%2BMcCartney&text=&newArrivals=false#'
-                            elif glasses_type == 'Eyeglasses':
+                            elif str(glasses_type).strip().lower() == 'eyeglasses':
                                 if str('Celine').strip().lower() == str(brand).strip().lower():
                                     brand_url = 'https://my.thelios.com/it/it/Maison/c/00?q=%3Arelevance%3Atype%3AVista%3AfittingDescription%3AUniversal%3AfittingDescription%3AInternational%3Apurchasable%3Apurchasable%3AimShip%3Afalse%3AnewArrivals%3Afalse%3AallCategoriesForName%3ACeline&text=&newArrivals=false#'
                                 elif str('Dior').strip().lower() == str(brand).strip().lower():
@@ -114,7 +113,7 @@ class Thelios_Scraper:
                                     brand_url = 'https://my.thelios.com/it/it/Maison/c/00?q=%3Arelevance%3Atype%3AVista%3AfittingDescription%3AUniversal%3AfittingDescription%3AInternational%3Apurchasable%3Apurchasable%3AimShip%3Afalse%3AnewArrivals%3Afalse%3AallCategoriesForName%3AGivenchy&text=&newArrivals=false#'
                                 elif str('Stella McCartney').strip().lower() == str(brand).strip().lower():
                                     brand_url = 'https://my.thelios.com/it/it/Maison/c/00?q=%3Arelevance%3Atype%3AVista%3AfittingDescription%3AUniversal%3AfittingDescription%3AInternational%3Apurchasable%3Apurchasable%3AimShip%3Afalse%3AnewArrivals%3Afalse%3AallCategoriesForName%3AStella%2BMcCartney&text=&newArrivals=false#'
-
+                            
                             self.browser.get(brand_url)
                             self.wait_until_browsing()
 
