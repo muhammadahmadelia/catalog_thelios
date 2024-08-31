@@ -33,8 +33,10 @@ from PIL import Image
 from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
 
+from lxml import html
+
 class myScrapingThread(threading.Thread):
-    def __init__(self, threadID: int, name: str, obj, product_urls: list[str], headers: dict, brand: str, glasses_type: str, frame_code: str) -> None:
+    def __init__(self, threadID: int, name: str, obj, product_urls: list[str], headers: dict, cookies: dict, brand: str, glasses_type: str, frame_code: str) -> None:
         threading.Thread.__init__(self)
         self.threadID = threadID
         self.name = name
@@ -42,13 +44,14 @@ class myScrapingThread(threading.Thread):
         self.brand = brand
         self.glasses_type = glasses_type
         self.headers = headers
+        self.cookies = cookies
         self.frame_code = frame_code
         self.obj = obj
         self.status = 'in progress'
         pass
 
     def run(self):
-        self.obj.scrape_products(self.product_urls, self.headers, self.brand, self.glasses_type, self.frame_code)
+        self.obj.scrape_products(self.product_urls, self.headers, self.cookies, self.brand, self.glasses_type, self.frame_code)
         self.status = 'completed'
 
     def active_threads(self):
@@ -56,7 +59,7 @@ class myScrapingThread(threading.Thread):
 
 
 class Thelios_Scraper:
-    def __init__(self, DEBUG: bool, result_filename: str, logs_filename: str) -> None:
+    def __init__(self, DEBUG: bool, result_filename: str, logs_filename: str, chrome_path: str) -> None:
         self.DEBUG = DEBUG
         self.result_filename = result_filename
         self.logs_filename = logs_filename
@@ -68,13 +71,14 @@ class Thelios_Scraper:
         self.chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
         self.args = ["hide_console", ]
         # self.browser = webdriver.Chrome(options=self.chrome_options, service_args=self.args)
-        self.browser = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=self.chrome_options)
+        # self.browser = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=self.chrome_options)
+        self.browser = webdriver.Chrome(service=ChromeService(chrome_path), options=self.chrome_options)
         self.data = []
         pass
 
     def controller(self, store: Store, brands_with_types: list[dict]):
         try:
-            cookies = ''
+            cookies = dict()
 
             self.browser.get(store.link)
             self.wait_until_browsing()
@@ -138,11 +142,12 @@ class Thelios_Scraper:
                                             if product_url not in product_urls: product_urls.append(product_url)
                                         frame_code = str(div_tag.get_attribute('onclick')).strip().split("'")[-2].strip()
 
-                                        if not cookies: cookies = self.get_cookies_from_browser()
-                                        headers = self.get_headers(cookies, self.browser.current_url)
+                                        if not cookies: 
+                                            cookies = self.get_cookies_from_browser()
+                                        headers = self.get_headers()
                                         
                                         # self.scrape_products(product_urls, headers, brand, glasses_type, frame_code)
-                                        self.create_thread(product_urls, headers, brand, glasses_type, frame_code)
+                                        self.create_thread(product_urls, headers, cookies, brand, glasses_type, frame_code)
 
                                         if self.thread_counter >= 10: 
                                             self.wait_for_thread_list_to_complete()
@@ -228,49 +233,64 @@ class Thelios_Scraper:
         self.browser.close()
         self.browser.switch_to.window(self.browser.window_handles[len(self.browser.window_handles) - 1])
     
-    def get_cookies_from_browser(self) -> str:
-        cookies = ''
+    def get_cookies_from_browser(self) -> dict:
+        cookies = dict()
         try:
             browser_cookies = self.browser.get_cookies()
-        
             for browser_cookie in browser_cookies:
-                if browser_cookie['name'] == '_hjIncludedInPageviewSample': 
-                    cookies = f'{browser_cookie["name"]}={browser_cookie["value"]}; __utmt=1; {cookies}'
-                else: cookies = f'{browser_cookie["name"]}={browser_cookie["value"]}; {cookies}'
-            cookies = cookies.strip()[:-1]
+                cookies[browser_cookie['name']] = browser_cookie["value"]
+            #     if browser_cookie['name'] == '_hjIncludedInPageviewSample': 
+            #         cookies = f'{browser_cookie["name"]}={browser_cookie["value"]}; __utmt=1; {cookies}'
+            #     else: cookies = f'{browser_cookie["name"]}={browser_cookie["value"]}; {cookies}'
+            # cookies = cookies.strip()[:-1]
         except Exception as e:
             if self.DEBUG: print(f'Exception in get_cookies_from_browser: {e}')
             self.print_logs(f'Exception in get_cookies_from_browser: {e}')
         finally: return cookies
 
-    def get_headers(self, cookies: str, referer: str):
+    def get_headers(self):
+        # return {
+        #     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+        #     'Accept-Encoding': 'gzip, deflate, br',
+        #     'Accept-Language': 'en-US,en;q=0.9',
+        #     'Cache-Control': 'max-age=0',
+        #     'Connection': 'keep-alive',
+        #     'Cookie': cookies,
+        #     'Host': 'my.thelios.com',
+        #     'Referer': referer,
+        #     'sec-ch-ua': '"Not_A Brand";v="99", "Google Chrome";v="109", "Chromium";v="109"',
+        #     'sec-ch-ua-mobile': '?0',
+        #     'sec-ch-ua-platform': '"Windows"',
+        #     'Sec-Fetch-Dest': 'document',
+        #     'Sec-Fetch-Mode': 'navigate',
+        #     'Sec-Fetch-Site': 'same-origin',
+        #     'Sec-Fetch-User': '?1',
+        #     'Upgrade-Insecure-Requests': '1',
+        #     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36'
+        # }
         return {
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
-            'Accept-Encoding': 'gzip, deflate, br',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
             'Accept-Language': 'en-US,en;q=0.9',
             'Cache-Control': 'max-age=0',
             'Connection': 'keep-alive',
-            'Cookie': cookies,
-            'Host': 'my.thelios.com',
-            'Referer': referer,
-            'sec-ch-ua': '"Not_A Brand";v="99", "Google Chrome";v="109", "Chromium";v="109"',
-            'sec-ch-ua-mobile': '?0',
-            'sec-ch-ua-platform': '"Windows"',
             'Sec-Fetch-Dest': 'document',
             'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'same-origin',
+            'Sec-Fetch-Site': 'none',
             'Sec-Fetch-User': '?1',
             'Upgrade-Insecure-Requests': '1',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36',
+            'sec-ch-ua': '"Chromium";v="116", "Not)A;Brand";v="24", "Google Chrome";v="116"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"Windows"',
         }
 
-    def scrape_products(self, product_urls: list[str], headers: dict, brand: str, glasses_type: str, frame_code: str):
+    def scrape_products(self, product_urls: list[str], headers: dict, cookies: dict, brand: str, glasses_type: str, frame_code: str):
         try:
             for product_url in product_urls:
-                response = self.make_request(product_url, headers)
+                response = self.make_request(product_url, headers, cookies)
                 if response:
                     soup = BeautifulSoup(response.text, 'lxml')
-
+                    
                     product = Product()
                     product.brand = brand
                     product.url = product_url
@@ -282,11 +302,11 @@ class Thelios_Scraper:
                     except: pass
 
                     product.number = f'{product.frame_code} {product.lens_code}'
-                    
                     try:
                         text = str(soup.select_one('div[class$="landscape-pdp-space"] > div').text).strip()
-                        product.frame_color = str(text).split(',')[0].strip().title().replace('\u00a0', ' ')
-                        product.lens_color = str(text).split(',')[-1].strip().title().replace('\u00a0', ' ')
+                        if text:
+                            product.frame_color = str(text).split(',')[0].strip().title().replace('\u00a0', ' ')
+                            product.lens_color = str(text).split(',')[-1].strip().title().replace('\u00a0', ' ')
                     except: pass
 
                     if not str(product.number): product.number = f'{product.frame_code} {product.lens_code}'
@@ -303,37 +323,78 @@ class Thelios_Scraper:
                         else: variant.inventory_quantity = 0
                     except: pass
 
+                    price = ''
                     try:
                         for price_div_tag in soup.select('div[class="price-box"]'):
-                            variant.listing_price = str(price_div_tag.text).strip().replace('€', '').strip()
-                            if variant.listing_price:
-                                if variant.listing_price[-3:] == ',00': 
-                                    variant.listing_price = f'{variant.listing_price[:-3]}.00'
+                            price = str(price_div_tag.text).strip().replace('€', '').strip()
+                            if price:
+                                if price[-3:] == ',00': 
+                                    price = f'{price[:-3]}.00'
+                                break
                     except: pass
-                    
+
+                    try:
+                        value = soup.select_one('ul > li[class*="price-selected"]').get('value')
+                        if 'public' in str(value).strip().lower():
+                            variant.listing_price = price
+                        else:
+                            variant.wholesale_price = price
+
+                        # print(value, variant.listing_price, variant.wholesale_price)
+                    except: pass
+
                     metafields = Metafields()
                     try: 
                         metafields.img_url = str(soup.select_one('div[class="carousel image-gallery__image js-gallery-image"] > div[class="item"] > img[class="lazyOwl"]').get('data-zoom-image')).strip()
                         if 'https://my.thelios.com' not in metafields.img_url: metafields.img_url = f'https://my.thelios.com{metafields.img_url}' 
                     except: pass
 
+                    
+                    d = ''
+                    if variant.listing_price: d = 'PRIVATE'
+                    else: d = 'PUBLIC'
+
                     try:
+                        api_headers = {
+                            'Accept': '*/*',
+                            'Accept-Language': 'en-US,en;q=0.9',
+                            'Connection': 'keep-alive',
+                            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                            'Origin': 'https://my.thelios.com',
+                            'Referer': product_url,
+                            'Sec-Fetch-Dest': 'empty',
+                            'Sec-Fetch-Mode': 'cors',
+                            'Sec-Fetch-Site': 'same-origin',
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'sec-ch-ua': '"Chromium";v="116", "Not)A;Brand";v="24", "Google Chrome";v="116"',
+                            'sec-ch-ua-mobile': '?0',
+                            'sec-ch-ua-platform': '"Windows"',
+                        }
+
                         s = requests.session()
-                        try: s.patch(url='https://my.thelios.com/it/it/my-account/update-selected-price', params={'PRIVATE': ''}, headers=headers)
+                        try: s.patch(url='https://my.thelios.com/it/it/my-account/update-selected-price', data=d, headers=api_headers, cookies=cookies)
                         except Exception as e: self.print_logs(e)
-                        response3 = s.get(url=product_url, headers=headers)
+
+                        response3 = s.get(url=product_url, headers=headers, cookies=cookies)
                         
                         if response3.status_code == 200:
                             soup2 = BeautifulSoup(response3.text, 'lxml')
                             
+                            price2 = ''
+
                             for price_div_tag in soup2.select('div[class="price-box"]'):
-                                variant.wholesale_price = str(price_div_tag.text).strip().replace('€', '').strip()
-                                if variant.wholesale_price:
-                                    if variant.wholesale_price[-3:] == ',00': 
-                                        variant.wholesale_price = f'{variant.wholesale_price[:-3]}.00'
+                                price2 = str(price_div_tag.text).strip().replace('€', '').strip()
+                                if price2:
+                                    if price2[-3:] == ',00': 
+                                        price2 = f'{price2[:-3]}.00'
+                            
+                            if variant.listing_price: variant.wholesale_price = price2
+                            else: variant.listing_price = price2
                                             
                     except Exception as e: self.print_logs(e)
 
+                        
                     product.metafields = metafields
                     product.variants = variant
                     self.data.append(product)
@@ -342,12 +403,12 @@ class Thelios_Scraper:
             self.print_logs(f'Exception in scrape_products: {e}')
             if self.DEBUG: print(f'Exception in scrape_products: {e}')
 
-    def make_request(self, url: str, headers: dict):
+    def make_request(self, url: str, headers: dict, cookies: dict):
         response = None
         for _ in range(0, 10):
             try:
-                response = requests.get(url=url, headers=headers)
-                if response == 200: break
+                response = requests.get(url=url, headers=headers, cookies=cookies)
+                if response.status_code == 200: break
                 else: sleep(0.5)
             except Exception as e:
                 self.print_logs(f'Exception in make_request: {e}')
@@ -355,9 +416,9 @@ class Thelios_Scraper:
                 sleep(0.5)
         return response
 
-    def create_thread(self, product_urls: list[str], headers: dict, brand: str, glasses_type: str, frame_code: str) -> None:
+    def create_thread(self, product_urls: list[str], headers: dict, cookies: dict, brand: str, glasses_type: str, frame_code: str) -> None:
         thread_name = "Thread-"+str(self.thread_counter)
-        self.thread_list.append(myScrapingThread(self.thread_counter, thread_name, self, product_urls, headers,  brand, glasses_type, frame_code))
+        self.thread_list.append(myScrapingThread(self.thread_counter, thread_name, self, product_urls, headers, cookies,  brand, glasses_type, frame_code))
         self.thread_list[self.thread_counter].start()
         self.thread_counter += 1
 
@@ -609,10 +670,11 @@ def read_data_from_json_file(DEBUG, result_filename: str):
                     # variant.weight = str(json_variant['weight']).strip()
                     # product.variants = variant
 
-                    image_attachment = download_image(img_url)
-                    if image_attachment:
-                        with open(f'Images/{sku}.jpg', 'wb') as f: f.write(image_attachment)
-                        crop_downloaded_image(f'Images/{sku}.jpg')
+                    if not os.path.exists(f'Images/{sku}.jpg'):
+                        image_attachment = download_image(img_url)
+                        if image_attachment:
+                            with open(f'Images/{sku}.jpg', 'wb') as f: f.write(image_attachment)
+                            crop_downloaded_image(f'Images/{sku}.jpg')
                     data.append([number, frame_code, frame_color, lens_color, brand, sku, wholesale_price, listing_price])
     except Exception as e:
         if DEBUG: print(f'Exception in read_data_from_json_file: {e}')
@@ -675,42 +737,48 @@ def crop_downloaded_image(filename):
     except Exception as e: print(f'Exception in crop_downloaded_image: {e}')
 
 def saving_picture_in_excel(data: list):
-    workbook = Workbook()
-    worksheet = workbook.active
+    try:
+        workbook = Workbook()
+        worksheet = workbook.active
 
-    worksheet.cell(row=1, column=1, value='Model Code')
-    worksheet.cell(row=1, column=2, value='Lens Code')
-    worksheet.cell(row=1, column=3, value='Color Frame')
-    worksheet.cell(row=1, column=4, value='Color Lens')
-    worksheet.cell(row=1, column=5, value='Brand')
-    worksheet.cell(row=1, column=6, value='SKU')
-    worksheet.cell(row=1, column=7, value='Wholesale Price')
-    worksheet.cell(row=1, column=8, value='Listing Price')
-    worksheet.cell(row=1, column=9, value="Image")
+        worksheet.cell(row=1, column=1, value='Model Code')
+        worksheet.cell(row=1, column=2, value='Lens Code')
+        worksheet.cell(row=1, column=3, value='Color Frame')
+        worksheet.cell(row=1, column=4, value='Color Lens')
+        worksheet.cell(row=1, column=5, value='Brand')
+        worksheet.cell(row=1, column=6, value='SKU')
+        worksheet.cell(row=1, column=7, value='Wholesale Price')
+        worksheet.cell(row=1, column=8, value='Listing Price')
+        worksheet.cell(row=1, column=9, value="Image")
 
-    for index, d in enumerate(data):
-        new_index = index + 2
+        for index, d in enumerate(data):
+            try:
+                new_index = index + 2
 
-        worksheet.cell(row=new_index, column=1, value=d[0])
-        worksheet.cell(row=new_index, column=2, value=d[1])
-        worksheet.cell(row=new_index, column=3, value=d[2])
-        worksheet.cell(row=new_index, column=4, value=d[3])
-        worksheet.cell(row=new_index, column=5, value=d[4])
-        worksheet.cell(row=new_index, column=6, value=d[5])
-        worksheet.cell(row=new_index, column=7, value=d[6])
-        worksheet.cell(row=new_index, column=8, value=d[7])
+                worksheet.cell(row=new_index, column=1, value=d[0])
+                worksheet.cell(row=new_index, column=2, value=d[1])
+                worksheet.cell(row=new_index, column=3, value=d[2])
+                worksheet.cell(row=new_index, column=4, value=d[3])
+                worksheet.cell(row=new_index, column=5, value=d[4])
+                worksheet.cell(row=new_index, column=6, value=d[5])
+                worksheet.cell(row=new_index, column=7, value=d[6])
+                worksheet.cell(row=new_index, column=8, value=d[7])
 
-        image = f'Images/{d[-3]}.jpg'
-        if os.path.exists(image):
-            im = Image.open(image)
-            width, height = im.size
-            worksheet.row_dimensions[new_index].height = height
-            worksheet.add_image(Imag(image), anchor='I'+str(new_index))
-            # col_letter = get_column_letter(7)
-            # worksheet.column_dimensions[col_letter].width = width
-
-    workbook.save('Thelios Results.xlsx')
-
+                image = f'Images/{d[-3]}.jpg'
+                if os.path.exists(image):
+                    im = Image.open(image)
+                    width, height = im.size
+                    worksheet.row_dimensions[new_index].height = height
+                    worksheet.add_image(Imag(image), anchor='I'+str(new_index))
+                    # col_letter = get_column_letter(7)
+                    # worksheet.column_dimensions[col_letter].width = width
+            except Exception as e:
+                if DEBUG: print(f'Exception in saving_picture_in_excel loop: {e}')
+                else: pass
+        workbook.save('Thelios Results.xlsx')
+    except Exception as e:
+        if DEBUG: print(f'Exception in saving_picture_in_excel: {e}')
+        else: pass
 DEBUG = True
 try:
     pathofpyfolder = os.path.realpath(sys.argv[0])
@@ -752,8 +820,15 @@ try:
 
     scrape_time = datetime.now().strftime('%d-%m-%Y %H-%M-%S')
     logs_filename = f'Logs/Logs {scrape_time}.txt'
+
+    chrome_path = ''
+    if not chrome_path:
+        chrome_path = ChromeDriverManager().install()
+        if 'chromedriver.exe' not in chrome_path:
+            chrome_path = str(chrome_path).split('/')[0].strip()
+            chrome_path = f'{chrome_path}\\chromedriver.exe'
     
-    Thelios_Scraper(DEBUG, result_filename, logs_filename).controller(store, brands)
+    Thelios_Scraper(DEBUG, result_filename, logs_filename, chrome_path).controller(store, brands)
     
     for filename in glob.glob('Images/*'): os.remove(filename)
     data = read_data_from_json_file(DEBUG, result_filename)

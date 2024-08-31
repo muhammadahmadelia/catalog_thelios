@@ -1,16 +1,8 @@
 {
     "brands": [
         {
-            "brand": "Dior",
-            "glasses_type": ["Eyeglasses", "Sunglasses"]
-        },
-        {
-            "brand": "Celine",
-            "glasses_type": ["Eyeglasses"]
-        },
-        {
             "brand": "Fendi",
-            "glasses_type": ["Sunglasses"]
+            "glasses_type": ["Sunglasses", "Eyeglasses"]
         }
     ]
 }
