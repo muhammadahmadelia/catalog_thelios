@@ -85,13 +85,15 @@ class Thelios_Scraper:
 
             if self.login(store.username, store.password):
                 if self.wait_until_element_found(20, 'css_selector', 'div[data-label="Sun"] > a'):
-                    print('Scraping products for')
+                    print('Scraping products for\n')
                     for brand_with_type in brands_with_types:
                         brand: str = brand_with_type['brand']
+                        print(f'Brand: {brand}')
+                        self.print_logs(f'Brand: {brand}')
 
                         for glasses_type in brand_with_type['glasses_type']:
                             
-                            print(f'Brand: {brand} | Type: {str(glasses_type).strip().title()}')
+                            
                             scraped_products = 0
                             brand_url = ''
                             
@@ -121,6 +123,17 @@ class Thelios_Scraper:
                             self.browser.get(brand_url)
                             self.wait_until_browsing()
 
+                            self.wait_until_element_found(30, 'css_selector', 'div[class="product__listing product__grid col-xs-12 "] > div')
+                            total_products = self.get_total_products(glasses_type)
+                            start_time = datetime.now()
+                            print(f'Type: {glasses_type} | Total products: {total_products}')
+                            self.print_logs(f'Type: {glasses_type} | Total products: {total_products}')
+                            print(f'Start Time: {start_time.strftime("%A, %d %b %Y %I:%M:%S %p")}')
+                            self.print_logs(f'Start Time: {start_time.strftime("%A, %d %b %Y %I:%M:%S %p")}')
+
+                            if total_products and int(total_products) > 0: 
+                                self.printProgressBar(scraped_products, total_products, prefix = 'Progress:', suffix = 'Complete', length = 50)
+
                             while True:
 
                                 self.wait_until_element_found(30, 'css_selector', 'div[class="product__listing product__grid col-xs-12 "] > div')
@@ -149,6 +162,9 @@ class Thelios_Scraper:
                                         # self.scrape_products(product_urls, headers, brand, glasses_type, frame_code)
                                         self.create_thread(product_urls, headers, cookies, brand, glasses_type, frame_code)
 
+                                        if total_products and int(total_products) > 0: 
+                                            self.printProgressBar(scraped_products, total_products, prefix = 'Progress:', suffix = 'Complete', length = 50)
+
                                         if self.thread_counter >= 10: 
                                             self.wait_for_thread_list_to_complete()
                                             self.save_to_json(self.data)
@@ -167,14 +183,36 @@ class Thelios_Scraper:
 
                             self.wait_for_thread_list_to_complete()
                             self.save_to_json(self.data)
+
+                            end_time = datetime.now()
+                            print(f'End Time: {end_time.strftime("%A, %d %b %Y %I:%M:%S %p")}')
+                            self.print_logs(f'End Time: {end_time.strftime("%A, %d %b %Y %I:%M:%S %p")}')
+                            print('Duration: {}\n'.format(end_time - start_time))
+                            self.print_logs('Duration: {}\n'.format(end_time - start_time))
             else: print(f'Failed to login \nURL: {store.link}\nUsername: {str(store.username)}\nPassword: {str(store.password)}')
         except Exception as e:
             if self.DEBUG: print(f'Exception in scraper controller: {e}')
-            else: pass
+            self.print_logs(f'Exception in scraper controller: {e}')
         finally: 
             self.wait_for_thread_list_to_complete()
             self.save_to_json(self.data)
             self.browser.quit()
+
+    def get_total_products(self, glasses_type: str) -> int:
+        total_products = 0
+        try:
+            doc_tree = html.fromstring(self.browser.page_source, 'lxml')
+            if glasses_type == 'Sunglasses':
+                total_products = str(doc_tree.xpath('//span[@class="facet__list__text" and contains(text(), "Sole")]/span[@class="facet__value__count"]/text()')[0]).strip()
+            elif glasses_type == 'Eyeglasses':
+                total_products = str(doc_tree.xpath('//span[@class="facet__list__text" and contains(text(), "Sole")]/span[@class="facet__value__count"]/text()')[0]).strip()
+        
+            if total_products: total_products = int(str(total_products).replace('(', '').replace(')', '').strip())
+        
+        except Exception as e:
+            if self.DEBUG: print(f'Exception in get_total_products: {str(e)}')
+            self.print_logs(f'Exception in get_total_products: {e}')
+        finally: return total_products
 
     def wait_until_browsing(self) -> None:
         while True:
@@ -199,7 +237,7 @@ class Thelios_Scraper:
                 except Exception as e: print(e)
         except Exception as e:
             if self.DEBUG: print(f'Exception in login: {str(e)}')
-            else: pass
+            self.print_logs(f'Exception in login: {str(e)}')
         finally: return login_flag
 
     def wait_until_element_found(self, wait_value: int, type: str, value: str) -> bool:
@@ -249,25 +287,6 @@ class Thelios_Scraper:
         finally: return cookies
 
     def get_headers(self):
-        # return {
-        #     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
-        #     'Accept-Encoding': 'gzip, deflate, br',
-        #     'Accept-Language': 'en-US,en;q=0.9',
-        #     'Cache-Control': 'max-age=0',
-        #     'Connection': 'keep-alive',
-        #     'Cookie': cookies,
-        #     'Host': 'my.thelios.com',
-        #     'Referer': referer,
-        #     'sec-ch-ua': '"Not_A Brand";v="99", "Google Chrome";v="109", "Chromium";v="109"',
-        #     'sec-ch-ua-mobile': '?0',
-        #     'sec-ch-ua-platform': '"Windows"',
-        #     'Sec-Fetch-Dest': 'document',
-        #     'Sec-Fetch-Mode': 'navigate',
-        #     'Sec-Fetch-Site': 'same-origin',
-        #     'Sec-Fetch-User': '?1',
-        #     'Upgrade-Insecure-Requests': '1',
-        #     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36'
-        # }
         return {
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
             'Accept-Language': 'en-US,en;q=0.9',
@@ -608,6 +627,28 @@ class Thelios_Scraper:
                 f.write(f'\n{log}')
         except: pass
 
+    def printProgressBar(self, iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r") -> None:
+        """
+        Call in a loop to create terminal progress bar
+        @params:
+            iteration   - Required  : current iteration (Int)
+            total       - Required  : total iterations (Int)
+            prefix      - Optional  : prefix string (Str)
+            suffix      - Optional  : suffix string (Str)
+            decimals    - Optional  : positive number of decimals in percent complete (Int)
+            length      - Optional  : character length of bar (Int)
+            fill        - Optional  : bar fill character (Str)
+            printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
+        """
+        percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+        filledLength = int(length * iteration // total)
+        bar = fill * filledLength + '-' * (length - filledLength)
+        print(f'\r{prefix} |{bar}| {percent}% {suffix}', end = printEnd)
+        # Print New Line on Complete
+        if iteration == total: 
+            print()
+
+
 def read_data_from_json_file(DEBUG, result_filename: str):
     data = []
     try:
@@ -676,9 +717,7 @@ def read_data_from_json_file(DEBUG, result_filename: str):
                             with open(f'Images/{sku}.jpg', 'wb') as f: f.write(image_attachment)
                             crop_downloaded_image(f'Images/{sku}.jpg')
                     data.append([number, frame_code, frame_color, lens_color, brand, sku, wholesale_price, listing_price])
-    except Exception as e:
-        if DEBUG: print(f'Exception in read_data_from_json_file: {e}')
-        else: pass
+    except Exception as e: print(f'Exception in read_data_from_json_file: {e}')
     finally: return data
 
 def download_image(url):
@@ -777,8 +816,8 @@ def saving_picture_in_excel(data: list):
                 else: pass
         workbook.save('Thelios Results.xlsx')
     except Exception as e:
-        if DEBUG: print(f'Exception in saving_picture_in_excel: {e}')
-        else: pass
+        print(f'Exception in saving_picture_in_excel: {e}')
+
 DEBUG = True
 try:
     pathofpyfolder = os.path.realpath(sys.argv[0])
@@ -836,5 +875,4 @@ try:
 
     saving_picture_in_excel(data)
 except Exception as e:
-    if DEBUG: print('Exception: '+str(e))
-    else: pass
+    print('Exception: '+str(e))
