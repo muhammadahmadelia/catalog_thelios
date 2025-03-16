@@ -108,6 +108,10 @@ class Thelios_Scraper:
                                     brand_url = 'https://my.thelios.com/it/it/Maison/c/00?q=%3Arelevance%3Atype%3ASole%3AfittingDescription%3AUniversal%3AfittingDescription%3AInternational%3Apurchasable%3Apurchasable%3AimShip%3Afalse%3AnewArrivals%3Afalse%3AallCategoriesForName%3AGivenchy&text=&newArrivals=false#'
                                 elif str('Stella McCartney').strip().lower() == str(brand).strip().lower():
                                     brand_url = 'https://my.thelios.com/it/it/Maison/c/00?q=%3Arelevance%3Atype%3ASole%3AfittingDescription%3AUniversal%3AfittingDescription%3AInternational%3Apurchasable%3Apurchasable%3AimShip%3Afalse%3AnewArrivals%3Afalse%3AallCategoriesForName%3AStella%2BMcCartney&text=&newArrivals=false#'
+                                elif str('Bulgari').strip().lower() == str(brand).strip().lower():
+                                    brand_url = 'https://my.thelios.com/it/it/Maison/c/00?q=%3Arelevance%3Atype%3ASole%3AfittingDescription%3AUniversal%3AfittingDescription%3AInternational%3Apurchasable%3Apurchasable%3AimShip%3Afalse%3AnewArrivals%3Afalse%3AallCategoriesForName%3ABulgari&text=&newArrivals=false#'
+                            
+                            
                             elif str(glasses_type).strip().lower() == 'eyeglasses':
                                 if str('Celine').strip().lower() == str(brand).strip().lower():
                                     brand_url = 'https://my.thelios.com/it/it/Maison/c/00?q=%3Arelevance%3Atype%3AVista%3AfittingDescription%3AUniversal%3AfittingDescription%3AInternational%3Apurchasable%3Apurchasable%3AimShip%3Afalse%3AnewArrivals%3Afalse%3AallCategoriesForName%3ACeline&text=&newArrivals=false#'
@@ -119,7 +123,9 @@ class Thelios_Scraper:
                                     brand_url = 'https://my.thelios.com/it/it/Maison/c/00?q=%3Arelevance%3Atype%3AVista%3AfittingDescription%3AUniversal%3AfittingDescription%3AInternational%3Apurchasable%3Apurchasable%3AimShip%3Afalse%3AnewArrivals%3Afalse%3AallCategoriesForName%3AGivenchy&text=&newArrivals=false#'
                                 elif str('Stella McCartney').strip().lower() == str(brand).strip().lower():
                                     brand_url = 'https://my.thelios.com/it/it/Maison/c/00?q=%3Arelevance%3Atype%3AVista%3AfittingDescription%3AUniversal%3AfittingDescription%3AInternational%3Apurchasable%3Apurchasable%3AimShip%3Afalse%3AnewArrivals%3Afalse%3AallCategoriesForName%3AStella%2BMcCartney&text=&newArrivals=false#'
-                            
+                                elif str('Bulgari').strip().lower() == str(brand).strip().lower():
+                                    brand_url = 'https://my.thelios.com/it/it/Maison/c/00?q=%3Arelevance%3AfittingDescription%3AUniversal%3AfittingDescription%3AInternational%3Apurchasable%3Apurchasable%3AimShip%3Afalse%3AnewArrivals%3Afalse%3AallCategoriesForName%3ABulgari%3Atype%3AVista&text=&newArrivals=false#'
+
                             self.browser.get(brand_url)
                             self.wait_until_browsing()
 
@@ -159,13 +165,13 @@ class Thelios_Scraper:
                                             cookies = self.get_cookies_from_browser()
                                         headers = self.get_headers()
                                         
-                                        # self.scrape_products(product_urls, headers, brand, glasses_type, frame_code)
+                                        # self.scrape_products(product_urls, headers, cookies, brand, glasses_type, frame_code)
                                         self.create_thread(product_urls, headers, cookies, brand, glasses_type, frame_code)
 
                                         if total_products and int(total_products) > 0: 
                                             self.printProgressBar(scraped_products, total_products, prefix = 'Progress:', suffix = 'Complete', length = 50)
 
-                                        if self.thread_counter >= 10: 
+                                        if self.thread_counter >= 25: 
                                             self.wait_for_thread_list_to_complete()
                                             self.save_to_json(self.data)
                                     
@@ -321,11 +327,17 @@ class Thelios_Scraper:
                     except: pass
 
                     product.number = f'{product.frame_code} {product.lens_code}'
+                    doc_tree = html.fromstring(response.text, 'lxml')
                     try:
-                        text = str(soup.select_one('div[class$="landscape-pdp-space"] > div').text).strip()
+                        text = str(doc_tree.xpath('//div[contains(@class, "landscape-pdp-space")]/div/text()')[0]).strip()
                         if text:
-                            product.frame_color = str(text).split(',')[0].strip().title().replace('\u00a0', ' ')
-                            product.lens_color = str(text).split(',')[-1].strip().title().replace('\u00a0', ' ')
+                            if 'con lenti' in text:
+                                product.frame_color = str(text).split('con lenti')[0].strip().title().replace('\u00a0', ' ')
+                                product.lens_color = str(text).split('con lenti')[-1].strip().title().replace('\u00a0', ' ')
+                            elif ',' in text:
+                                product.frame_color = str(text).split(',')[0].strip().title().replace('\u00a0', ' ')
+                                product.lens_color = str(text).split(',')[-1].strip().title().replace('\u00a0', ' ')
+                            else: print(text)
                     except: pass
 
                     if not str(product.number): product.number = f'{product.frame_code} {product.lens_code}'
@@ -363,6 +375,31 @@ class Thelios_Scraper:
                     except: pass
 
                     metafields = Metafields()
+                    
+                    try:
+                        text = doc_tree.xpath('//ul[@class="section-details-list"]/li[contains(text(), "Genere:")]/text()')[0].strip()
+                        if text: 
+                            metafields.for_who = str(text).split(':')[-1].strip().title()
+                    except: pass
+
+                    try:
+                        text = doc_tree.xpath('//ul[@class="section-details-list"]/li[contains(text(), "Materiale Lenti:")]/text()')[0].strip()
+                        if text:
+                            metafields.lens_material = str(text).split(':')[-1].strip().title()
+                    except: pass
+
+                    try:
+                        text = doc_tree.xpath('//ul[@class="section-details-list"]/li[contains(text(), "Forma:")]/text()')[0].strip()
+                        if text:
+                            metafields.frame_shape = str(text).split(':')[-1].strip().title()
+                    except: pass
+
+                    try:
+                        text = doc_tree.xpath('//ul[@class="section-details-list"]/li[contains(text(), "Materiale Frontale:")]/text()')[0].strip()
+                        if text:
+                            metafields.frame_material = str(text).split(':')[-1].strip().title()
+                    except: pass
+
                     try: 
                         metafields.img_url = str(soup.select_one('div[class="carousel image-gallery__image js-gallery-image"] > div[class="item"] > img[class="lazyOwl"]').get('data-zoom-image')).strip()
                         if 'https://my.thelios.com' not in metafields.img_url: metafields.img_url = f'https://my.thelios.com{metafields.img_url}' 
@@ -648,6 +685,11 @@ class Thelios_Scraper:
         if iteration == total: 
             print()
 
+def read_file(filename: str):
+    f = open(filename)
+    data = f.read()
+    f.close()
+    return data
 
 def read_data_from_json_file(DEBUG, result_filename: str):
     data = []
@@ -775,7 +817,7 @@ def crop_downloaded_image(filename):
             im.save(filename)
     except Exception as e: print(f'Exception in crop_downloaded_image: {e}')
 
-def saving_picture_in_excel(data: list):
+def saving_picture_in_excel(data: list, excel_results_filename: str):
     try:
         workbook = Workbook()
         worksheet = workbook.active
@@ -814,65 +856,128 @@ def saving_picture_in_excel(data: list):
             except Exception as e:
                 if DEBUG: print(f'Exception in saving_picture_in_excel loop: {e}')
                 else: pass
-        workbook.save('Thelios Results.xlsx')
+        workbook.save(excel_results_filename)
     except Exception as e:
         print(f'Exception in saving_picture_in_excel: {e}')
+
+# DEBUG = True
+# try:
+#     pathofpyfolder = os.path.realpath(sys.argv[0])
+#     # get path of Exe folder
+#     path = pathofpyfolder.replace(pathofpyfolder.split('\\')[-1], '')
+#     # download chromedriver.exe with same version and get its path
+#     # if os.path.exists('chromedriver.exe'): os.remove('chromedriver.exe')
+#     if os.path.exists('Thelios Results.xlsx'): os.remove('Thelios Results.xlsx')
+
+#     # chromedriver_autoinstaller.install(path)
+#     if '.exe' in pathofpyfolder.split('\\')[-1]: DEBUG = False
+    
+#     f = open('Thelios start.json')
+#     json_data = json.loads(f.read())
+#     f.close()
+
+#     brands = json_data['brands']
+
+    
+#     f = open('requirements/thelios.json')
+#     data = json.loads(f.read())
+#     f.close()
+
+#     store = Store()
+#     store.link = data['url']
+#     store.username = data['username']
+#     store.password = data['password']
+#     store.login_flag = True
+
+#     result_filename = 'requirements/Thelios Results.json'
+
+#     if not os.path.exists('Logs'): os.makedirs('Logs')
+
+#     log_files = glob.glob('Logs/*.txt')
+#     if len(log_files) > 5:
+#         oldest_file = min(log_files, key=os.path.getctime)
+#         os.remove(oldest_file)
+#         log_files = glob.glob('Logs/*.txt')
+
+#     scrape_time = datetime.now().strftime('%d-%m-%Y %H-%M-%S')
+#     logs_filename = f'Logs/Logs {scrape_time}.txt'
+
+#     chrome_path = ''
+#     if not chrome_path:
+#         chrome_path = ChromeDriverManager().install()
+#         if 'chromedriver.exe' not in chrome_path:
+#             chrome_path = str(chrome_path).split('/')[0].strip()
+#             chrome_path = f'{chrome_path}\\chromedriver.exe'
+    
+#     Thelios_Scraper(DEBUG, result_filename, logs_filename, chrome_path).controller(store, brands)
+    
+#     for filename in glob.glob('Images/*'): os.remove(filename)
+#     data = read_data_from_json_file(DEBUG, result_filename)
+#     os.remove(result_filename)
+
+#     saving_picture_in_excel(data)
+# except Exception as e:
+#     print('Exception: '+str(e))
+
 
 DEBUG = True
 try:
     pathofpyfolder = os.path.realpath(sys.argv[0])
     # get path of Exe folder
     path = pathofpyfolder.replace(pathofpyfolder.split('\\')[-1], '')
-    # download chromedriver.exe with same version and get its path
-    # if os.path.exists('chromedriver.exe'): os.remove('chromedriver.exe')
-    if os.path.exists('Thelios Results.xlsx'): os.remove('Thelios Results.xlsx')
-
-    # chromedriver_autoinstaller.install(path)
     if '.exe' in pathofpyfolder.split('\\')[-1]: DEBUG = False
-    
-    f = open('Thelios start.json')
-    json_data = json.loads(f.read())
-    f.close()
 
-    brands = json_data['brands']
+    chrome_path = ChromeDriverManager().install()
+    if 'chromedriver.exe' not in chrome_path:
+        chrome_path = str(chrome_path).split('/')[0].strip()
+        chrome_path = f'{chrome_path}\\chromedriver.exe'
 
-    
-    f = open('requirements/thelios.json')
-    data = json.loads(f.read())
-    f.close()
-
-    store = Store()
-    store.link = data['url']
-    store.username = data['username']
-    store.password = data['password']
-    store.login_flag = True
-
-    result_filename = 'requirements/Thelios Results.json'
-
+    # create directories
+    if not os.path.exists('requirements'): os.makedirs('requirements')
     if not os.path.exists('Logs'): os.makedirs('Logs')
-
+    if not os.path.exists('Images'): os.makedirs('Images')
+    
+    start_json_filename = 'Start.json'
+    credentails_filename = 'requirements/credentails.json'
+    json_results_filename = 'requirements/json_results.json'
+    excel_results_filename = 'Results.xlsx'
+    
+    # remove old files
+    if os.path.exists(json_results_filename): os.remove(json_results_filename)
+    if os.path.exists(excel_results_filename): os.remove(excel_results_filename)
     log_files = glob.glob('Logs/*.txt')
     if len(log_files) > 5:
         oldest_file = min(log_files, key=os.path.getctime)
         os.remove(oldest_file)
         log_files = glob.glob('Logs/*.txt')
-
-    scrape_time = datetime.now().strftime('%d-%m-%Y %H-%M-%S')
-    logs_filename = f'Logs/Logs {scrape_time}.txt'
-
-    chrome_path = ''
-    if not chrome_path:
-        chrome_path = ChromeDriverManager().install()
-        if 'chromedriver.exe' not in chrome_path:
-            chrome_path = str(chrome_path).split('/')[0].strip()
-            chrome_path = f'{chrome_path}\\chromedriver.exe'
-    
-    Thelios_Scraper(DEBUG, result_filename, logs_filename, chrome_path).controller(store, brands)
-    
     for filename in glob.glob('Images/*'): os.remove(filename)
-    data = read_data_from_json_file(DEBUG, result_filename)
-    os.remove(result_filename)
 
-    saving_picture_in_excel(data)
-except Exception as e:
-    print('Exception: '+str(e))
+
+    if os.path.exists(start_json_filename):
+        json_data = json.loads(read_file(start_json_filename))
+        
+        if 'brands' in json_data:
+            brands = json_data.get('brands')
+
+            if os.path.exists(credentails_filename):
+                credentails_json_data = json.loads(read_file(credentails_filename))
+
+                store = Store()
+                store.link = credentails_json_data.get('url')
+                store.username = credentails_json_data.get('username')
+                store.password = credentails_json_data.get('password')
+                store.login_flag = True
+
+                scrape_time = datetime.now().strftime('%d-%m-%Y %H-%M-%S')
+                logs_filename = f'Logs/Logs {scrape_time}.txt'
+                Thelios_Scraper(DEBUG, json_results_filename, logs_filename, chrome_path).controller(store, brands)
+                
+                data = read_data_from_json_file(DEBUG, json_results_filename)
+                
+                saving_picture_in_excel(data, excel_results_filename)
+
+            else: print(f'No {credentails_filename} file found')
+        else: print(f'No brands found in {start_json_filename} file')
+    else: print(f'No {start_json_filename} file found')
+    
+except Exception as e: print('Exception: '+str(e))
